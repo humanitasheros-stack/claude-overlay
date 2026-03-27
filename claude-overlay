@@ -1,0 +1,11 @@
+#!/bin/bash
+# Claude Overlay launcher
+# Activates the venv and runs the overlay
+
+OVERLAY_DIR="$HOME/.claude-overlay"
+VENV="$OVERLAY_DIR/venv"
+PYTHON="$VENV/bin/python3"
+
+export PYTHONPATH="$OVERLAY_DIR:$PYTHONPATH"
+
+exec "$PYTHON" -m claude_overlay "$@"
