@@ -37,9 +37,10 @@ COHERENCE_SUMMARY = DATA_DIR / "coherence_summary.md"
 MAX_COHERENCE_ENTRIES = 500
 
 # Command overlay
-CLAUDE_CODE_BIN = "claude"  # Should be on PATH
+CLAUDE_CODE_BIN = str(HOME / ".npm-global" / "bin" / "claude")  # Absolute path — systemd strips PATH
 OVERLAY_HOTKEY = "Super+c"
-MAX_CONTEXT_TOKENS = 4000  # Approximate token budget for context injection
+MAX_CONTEXT_TOKENS = 1500  # Slimmed down — less context = faster responses
+QUERY_TIMEOUT = 300  # 5 minutes — Claude Code needs breathing room
 
 # Ensure dirs exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)

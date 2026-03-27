@@ -24,6 +24,7 @@ from . import config
 from .daemon import ContextDaemon
 from .coherence import CoherenceLog
 from .toggle_server import ToggleServer, send_toggle
+from .reminders import get_reminders
 
 logger = logging.getLogger("claude-overlay")
 
@@ -41,7 +42,7 @@ CSS = b"""
     border-radius: 8px;
     padding: 12px;
     font-family: monospace;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 #input-box:focus {
@@ -52,7 +53,7 @@ CSS = b"""
     background-color: rgba(35, 35, 40, 0.9);
     color: #d4cec0;
     font-family: monospace;
-    font-size: 13px;
+    font-size: 16px;
     padding: 12px;
     border-radius: 8px;
 }
@@ -207,22 +208,38 @@ class ClaudeOverlayWindow(Gtk.Window):
 
     def _run_query(self, query: str):
         """Run a query through Claude Code."""
-        # Build context-enriched prompt
-        context = self.daemon.get_context()
-        briefing = self.coherence.get_briefing(max_entries=15)
+        # Build a LEAN context — just enough for awareness, not a novel
+        try:
+            with open(config.CONTEXT_FILE) as f:
+                ctx = json.load(f)
+            recent = ctx.get("recently_modified", [])[:5]
+            recent_names = [r.get("name", "") for r in recent]
+            projects = list(ctx.get("projects", {}).keys())
+            context_line = (
+                f"[Context: Active projects: {', '.join(projects)}. "
+                f"Recently touched: {', '.join(recent_names)}. "
+                f"Workspace: ~/MyData/AI-Workspace/]"
+            )
+        except Exception:
+            context_line = "[Context: Workspace at ~/MyData/AI-Workspace/]"
+
+        briefing = self.coherence.get_briefing(max_entries=5)
+        reminders = get_reminders()
 
         full_prompt = (
-            f"{context}\n\n"
-            f"{briefing}\n\n"
-            f"User query: {query}"
+            f"{context_line}\n"
+            f"{briefing}\n"
         )
+        if reminders:
+            full_prompt += f"{reminders}\n"
+        full_prompt += f"\n{query}"
 
         try:
             result = subprocess.run(
                 [config.CLAUDE_CODE_BIN, "-p", "--output-format", "text", full_prompt],
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=config.QUERY_TIMEOUT,
                 cwd=str(config.WORKSPACE),
                 env={**os.environ, "CLAUDE_CODE_DISABLE_NONINTERACTIVE_HINT": "1"},
             )
@@ -238,7 +255,7 @@ class ClaudeOverlayWindow(Gtk.Window):
             self.coherence._rewrite()
 
         except subprocess.TimeoutExpired:
-            response = "[Query timed out after 120 seconds]"
+            response = f"[Query timed out after {config.QUERY_TIMEOUT} seconds]"
         except FileNotFoundError:
             response = (
                 "[Error: 'claude' not found on PATH. "
