@@ -1,0 +1,51 @@
+#!/bin/bash
+# claude-speak — Read Claude Code responses aloud via Piper TTS
+# Triggered automatically by Claude Code Stop hook
+# Toggle: set CLAUDE_TTS=0 to disable, CLAUDE_TTS=1 to enable
+
+# Check kill switch
+if [ "${CLAUDE_TTS:-1}" = "0" ]; then
+    exit 0
+fi
+
+# Check toggle file (allows runtime on/off without env vars)
+if [ -f /tmp/claude-tts-off ]; then
+    exit 0
+fi
+
+MODEL="$HOME/.local/share/piper-voices/en_US-lessac-medium.onnx"
+
+# Read the hook JSON from stdin, extract the response text
+TEXT=$(jq -r '.last_assistant_message // empty' 2>/dev/null)
+
+if [ -z "$TEXT" ]; then
+    exit 0
+fi
+
+# Strip markdown formatting for cleaner speech
+TEXT=$(echo "$TEXT" | sed -E '
+    s/^#{1,6}\s+//g
+    s/\*\*([^*]+)\*\*/\1/g
+    s/\*([^*]+)\*/\1/g
+    s/`[^`]+`//g
+    s/```[^`]*```//g
+    s/\[([^\]]+)\]\([^\)]+\)/\1/g
+    s/^\s*[-*]\s+//g
+    s/^\s*[0-9]+\.\s+//g
+    s/|//g
+')
+
+# Skip if text is too short (likely just a tool call with no commentary)
+if [ ${#TEXT} -lt 10 ]; then
+    exit 0
+fi
+
+# Truncate very long responses to avoid minutes of TTS
+if [ ${#TEXT} -gt 2000 ]; then
+    TEXT="${TEXT:0:2000}... Response truncated for speech."
+fi
+
+# Speak it (async — don't block Claude Code)
+echo "$TEXT" | piper --model "$MODEL" --output-raw 2>/dev/null | aplay -r 22050 -f S16_LE -c 1 -q 2>/dev/null &
+
+exit 0

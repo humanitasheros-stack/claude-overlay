@@ -1,0 +1,44 @@
+#!/bin/bash
+# Voice dictation toggle — press once to start, again to stop.
+# Uses nerd-dictation + VOSK. Types directly into focused window.
+
+NERD_DICTATION="$HOME/.local/share/nerd-dictation/nerd-dictation"
+VOSK_MODEL="$HOME/.local/share/vosk-models/vosk-model-en-us-0.22"
+PYTHON="$HOME/.local/share/dictation-env/bin/python3"
+PIDFILE="/tmp/nerd-dictation.pid"
+
+case "${1:-toggle}" in
+  begin|start)
+    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+      echo "Already running (PID $(cat "$PIDFILE"))"
+      exit 0
+    fi
+    echo "Starting dictation..."
+    "$PYTHON" "$NERD_DICTATION" begin \
+      --vosk-model-dir="$VOSK_MODEL" \
+      --simulate-input-tool=WTYPE \
+      --continuous \
+      --numbers-as-digits \
+      --punctuate-from-previous-timeout=0.5 \
+      --timeout=30 &
+    echo $! > "$PIDFILE"
+    notify-send "Dictation ON" "Speak now — words appear at cursor" 2>/dev/null
+    ;;
+  end|stop)
+    if [ -f "$PIDFILE" ]; then
+      "$PYTHON" "$NERD_DICTATION" end 2>/dev/null
+      rm -f "$PIDFILE"
+      notify-send "Dictation OFF" "" 2>/dev/null
+    fi
+    ;;
+  toggle)
+    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+      exec "$0" end
+    else
+      exec "$0" begin
+    fi
+    ;;
+  *)
+    echo "Usage: dictate [begin|end|toggle]"
+    ;;
+esac
