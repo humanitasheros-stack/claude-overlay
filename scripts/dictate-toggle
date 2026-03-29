@@ -1,6 +1,25 @@
 #!/bin/bash
 # Voice dictation toggle — press once to start, again to stop.
 # Uses nerd-dictation + VOSK. Types directly into focused window.
+#
+# Bind to a hotkey (e.g., Super+D in COSMIC/GNOME).
+# IMPORTANT: If using COSMIC Spawn(), do NOT pass arguments — this script
+# defaults to "toggle" when called with no args.
+#
+# Requirements:
+#   - nerd-dictation (https://github.com/ideasman42/nerd-dictation)
+#   - VOSK model (https://alphacephei.com/vosk/models)
+#   - parec (PulseAudio/PipeWire)
+#   - wtype (Wayland text input)
+#   - notify-send (desktop notifications)
+#   - Python venv with vosk package
+
+# Ensure PipeWire/PulseAudio and Wayland environment is available
+# (COSMIC/GNOME hotkeys may spawn without some of these;
+#  setsid subshell needs them passed explicitly)
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export PIPEWIRE_RUNTIME_DIR="$XDG_RUNTIME_DIR"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 
 NERD_DICTATION="$HOME/.local/share/nerd-dictation/nerd-dictation"
 VOSK_MODEL="$HOME/.local/share/vosk-models/vosk-model-en-us-0.22"
@@ -14,13 +33,23 @@ case "${1:-toggle}" in
       exit 0
     fi
     echo "Starting dictation..."
-    "$PYTHON" "$NERD_DICTATION" begin \
-      --vosk-model-dir="$VOSK_MODEL" \
-      --simulate-input-tool=WTYPE \
-      --continuous \
-      --numbers-as-digits \
-      --punctuate-from-previous-timeout=0.5 \
-      --timeout=30 &
+    # Pass full environment into subshell (desktop hotkeys strip some vars)
+    setsid env \
+      XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
+      WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" \
+      PIPEWIRE_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
+      bash -c "
+      $PYTHON $NERD_DICTATION begin \
+        --vosk-model-dir=$VOSK_MODEL \
+        --sample-rate=16000 \
+        --input=PAREC \
+        --simulate-input-tool=WTYPE \
+        --continuous \
+        --numbers-as-digits \
+        --punctuate-from-previous-timeout=0.5 \
+        --timeout=30 \
+        >> /tmp/dictate-debug.log 2>&1
+    " &
     echo $! > "$PIDFILE"
     notify-send "Dictation ON" "Speak now — words appear at cursor" 2>/dev/null
     ;;
@@ -39,6 +68,6 @@ case "${1:-toggle}" in
     fi
     ;;
   *)
-    echo "Usage: dictate [begin|end|toggle]"
+    echo "Usage: dictate-toggle [begin|end|toggle]"
     ;;
 esac
