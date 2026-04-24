@@ -1,3 +1,15 @@
+# ⚠ Deprecated — April 2026
+
+This repository is no longer maintained and is being archived.
+
+**Why deprecated.** When this overlay was built (March 2026), Claude Code lacked persistent cross-session memory. The overlay provided a coherence layer that watched files and injected context into queries. Anthropic's platform upgrade in April 2026 introduced built-in mechanisms — project-scoped CLAUDE.md, session continuity via `claude --resume`, per-project hook configuration in `settings.json` — that serve the same function natively, more cleanly, and without the maintenance burden of running a separate service.
+
+**The overlay carried us during the Anthropic outage in early April 2026** when Claude Code was unreliable and persistence mattered more than infrastructure elegance. Retiring it now is a form of completion — the function it served is now native to the platform.
+
+If you have it installed, see [SAFE_REMOVAL.md](./SAFE_REMOVAL.md) for clean uninstallation.
+
+---
+
 # Claude Overlay
 
 **An AI-integrated system layer for Pop!_OS COSMIC that makes Claude intrinsic to the operating system.**
